@@ -434,6 +434,43 @@ for(const [name,d] of Object.entries(JAPAN.paths)){
 }
 jsvg.appendChild(pathFrag);
 
+/* ---------- Japan map: 動員地域へ寄せて拡大 ---------- */
+const JAPAN_BASE=JAPAN.viewBox.split(/\s+/).map(Number);   // [x,y,w,h]
+let japanAnim=null;
+function animateJapanViewBox(target){
+  if(japanAnim) cancelAnimationFrame(japanAnim);
+  const cur=(jsvg.getAttribute("viewBox")||JAPAN.viewBox).split(/\s+/).map(Number);
+  const t0=performance.now(), dur=520;
+  const ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+  (function step(now){
+    const p=Math.min(1,(now-t0)/dur), e=ease(p);
+    const v=cur.map((c,i)=>c+(target[i]-c)*e);
+    jsvg.setAttribute("viewBox",`${v[0].toFixed(1)} ${v[1].toFixed(1)} ${v[2].toFixed(1)} ${v[3].toFixed(1)}`);
+    if(p<1) japanAnim=requestAnimationFrame(step);
+  })(t0);
+}
+function fitJapanToPrefectures(names){
+  const boxes=names.map(n=>jsvg.querySelector(`[data-name="${n}"]`))
+                   .filter(Boolean).map(p=>p.getBBox()).filter(b=>b.width&&b.height);
+  if(!boxes.length){ animateJapanViewBox(JAPAN_BASE); return; }
+  let x0=Math.min(...boxes.map(b=>b.x)),       y0=Math.min(...boxes.map(b=>b.y));
+  let x1=Math.max(...boxes.map(b=>b.x+b.width)),y1=Math.max(...boxes.map(b=>b.y+b.height));
+  let bw=x1-x0, bh=y1-y0;
+  // 余白（塊の周りに少しゆとり）
+  const padX=bw*0.35+JAPAN_BASE[2]*0.03, padY=bh*0.35+JAPAN_BASE[3]*0.03;
+  x0-=padX; y0-=padY; bw+=padX*2; bh+=padY*2;
+  // 寄せ過ぎ防止（最小でも全体の約25%幅は確保）
+  const minW=JAPAN_BASE[2]*0.25, minH=JAPAN_BASE[3]*0.25;
+  if(bw<minW){ x0-=(minW-bw)/2; bw=minW; }
+  if(bh<minH){ y0-=(minH-bh)/2; bh=minH; }
+  // 表示領域の縦横比に合わせて広げる
+  const r=jsvg.getBoundingClientRect();
+  const A=(r.width&&r.height)?r.width/r.height:JAPAN_BASE[2]/JAPAN_BASE[3];
+  if(bw/bh<A){ const nw=bh*A; x0-=(nw-bw)/2; bw=nw; }
+  else       { const nh=bw/A; y0-=(nh-bh)/2; bh=nh; }
+  animateJapanViewBox([x0,y0,bw,bh]);
+}
+
 /* prefecture hover tooltip */
 const tip=document.getElementById("tip");
 jsvg.addEventListener("mousemove",e=>{
@@ -557,6 +594,9 @@ function select(id){
     const p=jsvg.querySelector(`[data-name="${name}"]`);
     if(p) p.classList.add("lit");
   });
+  // 動員地域へ寄せて拡大（海軍の戦いは全体表示へ戻す）
+  if(b.prefectures.length) fitJapanToPrefectures(b.prefectures);
+  else animateJapanViewBox(JAPAN_BASE);
 
   placeholder.style.display="none";
   infoInner.style.display="block";
