@@ -507,23 +507,28 @@ BATTLES.forEach(b=>{
     e.preventDefault();
     zoomAt(e.clientX,e.clientY, e.deltaY>0?1.18:0.85);
   },{passive:false});
-  // 曳いてスクロール
+  // 曳いてスクロール（pointer capture は使わず、印のクリックを妨げない）
   let dragging=false,moved=false,lx=0,ly=0;
-  tsvg.addEventListener("pointerdown",e=>{
-    dragging=true; moved=false; lx=e.clientX; ly=e.clientY;
-    tsvg.setPointerCapture(e.pointerId); theatreEl.classList.add("grabbing");
-  });
-  tsvg.addEventListener("pointermove",e=>{
+  function onMove(e){
     if(!dragging) return;
     const dx=e.clientX-lx, dy=e.clientY-ly;
     if(Math.abs(dx)+Math.abs(dy)>3) moved=true;
     const r=tsvg.getBoundingClientRect();
     vb.x-=dx/r.width*vb.w; vb.y-=dy/r.height*vb.h;
     lx=e.clientX; ly=e.clientY; clampPan(); apply();
+  }
+  function endDrag(){
+    if(!dragging) return;
+    dragging=false; theatreEl.classList.remove("grabbing");
+    window.removeEventListener("pointermove",onMove);
+    window.removeEventListener("pointerup",endDrag);
+  }
+  tsvg.addEventListener("pointerdown",e=>{
+    dragging=true; moved=false; lx=e.clientX; ly=e.clientY;
+    theatreEl.classList.add("grabbing");
+    window.addEventListener("pointermove",onMove);
+    window.addEventListener("pointerup",endDrag);
   });
-  function endDrag(){ dragging=false; theatreEl.classList.remove("grabbing"); }
-  tsvg.addEventListener("pointerup",endDrag);
-  tsvg.addEventListener("pointercancel",endDrag);
   // 曳行後の誤クリックで戦闘が選ばれぬよう抑止
   mg.addEventListener("click",e=>{ if(moved){ e.stopPropagation(); e.preventDefault(); } },true);
   // ボタン操作
