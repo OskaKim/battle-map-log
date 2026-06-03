@@ -23,6 +23,9 @@
   --accent:#b8402b;
   --accent-2:#d9613f;
   --gold:#c9a14a;
+  --home:#cf4633;     /* 日本本国 */
+  --axis:#cf9b3f;     /* 友好国（枢軸） */
+  --allied:#5d83a6;   /* 敵対国（連合国） */
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -84,7 +87,26 @@ h1 .sub{display:block;font-size:.42em;font-weight:600;color:var(--gold);
 .theatre svg{display:block;width:100%;height:auto;cursor:grab;touch-action:none}
 .theatre.grabbing svg{cursor:grabbing}
 .country{fill:var(--land);stroke:var(--land-stroke);stroke-width:.35;opacity:.9;vector-effect:non-scaling-stroke}
+.country.home{fill:var(--home)}
+.country.axis{fill:var(--axis)}
+.country.allied{fill:var(--allied)}
 #graticule line{stroke:rgba(150,200,225,.10);stroke-width:.6;vector-effect:non-scaling-stroke}
+/* historical zones */
+#zones{pointer-events:none}
+#zones .sphere-fill{fill:rgba(207,155,63,.14);stroke:rgba(224,179,74,.55);
+  stroke-width:1;stroke-dasharray:2 2.5;vector-effect:non-scaling-stroke}
+#zones .defense-line{fill:none;stroke:#f0c95a;stroke-width:1.8;
+  stroke-dasharray:7 4;stroke-linejoin:round;stroke-linecap:round;
+  vector-effect:non-scaling-stroke;filter:drop-shadow(0 0 2px rgba(0,0,0,.5))}
+#zones.hide-sphere .sphere-fill{display:none}
+#zones.hide-defense .defense-line{display:none}
+.zones-legend{margin-top:8px}
+.zones-legend label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;
+  font-size:.78rem;color:var(--paper)}
+.zones-legend input{accent-color:var(--gold);cursor:pointer}
+.legend i.ln{width:22px;height:0;border-radius:0;background:none!important}
+.legend i.ln.sphere{border-top:2px dotted rgba(224,179,74,.9)}
+.legend i.ln.defense{border-top:3px dashed #f0c95a}
 /* zoom controls */
 .map-ctrl{position:absolute;top:10px;right:10px;display:flex;flex-direction:column;gap:6px;z-index:3}
 .map-ctrl button{width:32px;height:32px;border:1px solid rgba(201,161,74,.5);
@@ -184,6 +206,7 @@ footer{margin-top:30px;text-align:center;font-size:.72rem;color:#5a5544;letter-s
         <svg id="theatre" preserveAspectRatio="xMidYMid meet">
           <g id="graticule"></g>
           <g id="countries"></g>
+          <g id="zones"></g>
           <g id="markers"></g>
         </svg>
         <div class="map-ctrl">
@@ -194,8 +217,14 @@ footer{margin-top:30px;text-align:center;font-size:.72rem;color:#5a5544;letter-s
       </div>
       <div class="legend">
         <span><i style="background:var(--accent)"></i>戦闘地点（クリック）</span>
-        <span><i style="background:var(--land)"></i>陸地</span>
-        <span><i style="background:var(--sea)"></i>海域・太平洋</span>
+        <span><i style="background:var(--home)"></i>日本</span>
+        <span><i style="background:var(--axis)"></i>友好国（枢軸）</span>
+        <span><i style="background:var(--allied)"></i>敵対国（連合国）</span>
+        <span><i style="background:var(--land)"></i>中立・その他</span>
+      </div>
+      <div class="legend zones-legend">
+        <label><input type="checkbox" id="tgSphere" checked><i class="ln sphere"></i>影響圏（1942 最大進出範囲）</label>
+        <label><input type="checkbox" id="tgDefense" checked><i class="ln defense"></i>絶対国防圏（1943）</label>
       </div>
     </section>
 
@@ -411,15 +440,61 @@ for(let lat=-60; lat<=80; lat+=30){
 }
 grat.innerHTML=gl;
 
-// countries
+// countries — 当時の陣営で色分け（近代の国名を代理に用いた概略）
+const HOME=new Set(["Japan"]);
+const AXIS=new Set([   // 友好国（枢軸・日本と協力）
+  "Thailand","Germany","Italy","Hungary","Romania","Bulgaria","Finland"
+]);
+const ALLIED=new Set([ // 敵対国（連合国）
+  "United States of America","United Kingdom","China","Australia","New Zealand",
+  "Netherlands","Canada","India","France"
+]);
+function sideOf(name){
+  if(HOME.has(name)) return "home";
+  if(AXIS.has(name)) return "axis";
+  if(ALLIED.has(name)) return "allied";
+  return "";
+}
 const cg=document.getElementById("countries");
 const cFrag=document.createDocumentFragment();
 for(const [name,d] of Object.entries(WORLD.paths)){
   const p=document.createElementNS(SVGNS,"path");
-  p.setAttribute("d",d); p.setAttribute("class","country"); p.dataset.name=name;
+  const side=sideOf(name);
+  p.setAttribute("d",d); p.setAttribute("class","country"+(side?" "+side:"")); p.dataset.name=name;
   cFrag.appendChild(p);
 }
 cg.appendChild(cFrag);
+
+/* ---------- Historical zones (影響圏 / 絶対国防圏) ---------- */
+// 経度・緯度の頂点列を投影して経路を作る（概略・仮）
+function pathFromLonLat(pts,close){
+  let s="";
+  pts.forEach((pt,i)=>{ const [x,y]=projW(pt[0],pt[1]); s+=(i?"L":"M")+x.toFixed(1)+","+y.toFixed(1)+" "; });
+  return s+(close?"Z":"");
+}
+// 1942年ごろの最大進出範囲（外周→大陸側の前線で閉じる）
+const SPHERE=[
+  [173,52.5],[178,50],[166.6,19.3],[173,1.4],[161,-10.5],[150,-10.6],[147,-11],
+  [130,-11],[114,-9.5],[104,-7],[98,-3],[94,12],[93,24],
+  [98,26],[104,30],[111,34],[114,38],[119,42],[124,46],[128,50],[135,51],
+  [142,48],[148,46],[156,50]
+];
+// 1943年 絶対国防圏（千島〜小笠原〜内南洋〜西部ニューギニア〜スンダ〜ビルマ）※開いた弧
+const DEFENSE=[
+  [156,50],[142,44],[142,27],[146,15],[151.8,7.4],[141,2],[134,-2],[133,-5],
+  [127,-7],[120,-9],[112,-9],[105,-7],[99,0],[94,16],[93,24]
+];
+const zones=document.getElementById("zones");
+zones.innerHTML=
+  `<path class="sphere-fill" d="${pathFromLonLat(SPHERE,true)}"/>`+
+  `<path class="defense-line" d="${pathFromLonLat(DEFENSE,false)}"/>`;
+// 凡例トグル
+document.getElementById("tgSphere").addEventListener("change",e=>{
+  zones.classList.toggle("hide-sphere",!e.target.checked);
+});
+document.getElementById("tgDefense").addEventListener("change",e=>{
+  zones.classList.toggle("hide-defense",!e.target.checked);
+});
 
 /* ---------- Render Japan map ---------- */
 const jsvg=document.getElementById("japan");
