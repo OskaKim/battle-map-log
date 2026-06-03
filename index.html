@@ -81,9 +81,18 @@ h1 .sub{display:block;font-size:.42em;font-weight:600;color:var(--gold);
 /* ---------- Theatre (left) ---------- */
 .theatre{position:relative;border-radius:4px;overflow:hidden;
   background:radial-gradient(120% 120% at 50% 0%,var(--sea) 0%,var(--sea-deep) 100%)}
-.theatre svg{display:block;width:100%;height:auto}
-.country{fill:var(--land);stroke:var(--land-stroke);stroke-width:.35;opacity:.9}
-#graticule line{stroke:rgba(150,200,225,.10);stroke-width:.6}
+.theatre svg{display:block;width:100%;height:auto;cursor:grab;touch-action:none}
+.theatre.grabbing svg{cursor:grabbing}
+.country{fill:var(--land);stroke:var(--land-stroke);stroke-width:.35;opacity:.9;vector-effect:non-scaling-stroke}
+#graticule line{stroke:rgba(150,200,225,.10);stroke-width:.6;vector-effect:non-scaling-stroke}
+/* zoom controls */
+.map-ctrl{position:absolute;top:10px;right:10px;display:flex;flex-direction:column;gap:6px;z-index:3}
+.map-ctrl button{width:32px;height:32px;border:1px solid rgba(201,161,74,.5);
+  background:rgba(13,28,37,.72);color:#f3ead2;font-size:17px;font-weight:700;
+  border-radius:4px;cursor:pointer;line-height:1;display:flex;align-items:center;
+  justify-content:center;backdrop-filter:blur(2px);transition:background .15s,border-color .15s}
+.map-ctrl button:hover{background:rgba(184,64,43,.85);border-color:var(--accent-2)}
+.map-ctrl button:active{transform:translateY(1px)}
 .marker{cursor:pointer}
 .marker .ping{fill:var(--accent-2);opacity:.5;transform-origin:center;
   transform-box:fill-box;animation:ping 2.4s ease-out infinite}
@@ -177,6 +186,11 @@ footer{margin-top:30px;text-align:center;font-size:.72rem;color:#5a5544;letter-s
           <g id="countries"></g>
           <g id="markers"></g>
         </svg>
+        <div class="map-ctrl">
+          <button id="zoomIn" type="button" title="拡大" aria-label="拡大">＋</button>
+          <button id="zoomOut" type="button" title="縮小" aria-label="縮小">－</button>
+          <button id="zoomReset" type="button" title="元に戻す" aria-label="元に戻す">⟳</button>
+        </div>
       </div>
       <div class="legend">
         <span><i style="background:var(--accent)"></i>戦闘地点（クリック）</span>
@@ -237,8 +251,140 @@ const BATTLES = [
     originLabel:"北関東（栃木・茨城・群馬）",
     prefectures:["栃木県","茨城県","群馬県"],
     summary:"米軍の比島進攻に備えた前哨戦。第14師団を基幹とする守備隊が地下陣地に拠って抵抗し、当初「数日で陥落」と見られた戦闘は二か月以上に及んだ。師団司令部は宇都宮（栃木）、基幹連隊は北関東一帯から動員されている。"
+  },
+  {
+    id:"iwojima",
+    name:"硫黄島の戦い",
+    period:"1945.2.19 — 3.26",
+    lat:24.78, lon:141.32, label:"硫黄島",
+    jpLoss:"約 21,000 名", jpLossNote:"守備隊ほぼ全滅",
+    usLoss:"約 26,000 名", usLossNote:"戦死約7,000・戦傷約19,000",
+    unit:"小笠原兵団（第109師団）", unitNote:"栗林忠道中将 指揮",
+    originLabel:"東京（小笠原・本土）",
+    prefectures:["東京都"],
+    summary:"本土防衛の最前線。栗林中将の下、守備隊は地下坑道に拠って徹底抗戦し、米軍に太平洋戦線屈指の損害を与えた。行政上は東京府小笠原支庁に属し、占領後は本土空襲の中継基地となった。"
+  },
+  {
+    id:"guadalcanal",
+    name:"ガダルカナル島の戦い",
+    period:"1942.8.7 — 1943.2.7",
+    lat:-9.43, lon:160.0, label:"ガダルカナル",
+    jpLoss:"約 20,800 名", jpLossNote:"戦死・戦病死、多くが餓死",
+    usLoss:"約 7,100 名", usLossNote:"連合軍合計",
+    unit:"第17軍（第2師団 基幹）", unitNote:"仙台編成・百武晴吉中将",
+    originLabel:"東北（仙台・宮城ほか）",
+    prefectures:["宮城県","福島県","山形県"],
+    summary:"攻勢から守勢へ、戦局の転換点となった消耗戦。仙台で編成された第2師団を基幹とする部隊が逐次投入されたが補給が続かず、多くが「餓島」と呼ばれた島で飢餓に斃れた。半年に及ぶ激闘の末、日本軍は撤退した。"
+  },
+  {
+    id:"midway",
+    name:"ミッドウェー海戦",
+    period:"1942.6.5 — 6.7",
+    lat:28.2, lon:-177.37, label:"ミッドウェー",
+    jpLoss:"約 3,000 名", jpLossNote:"空母4隻喪失",
+    usLoss:"約 360 名", usLossNote:"空母1隻喪失",
+    unit:"連合艦隊 第一航空艦隊", unitNote:"南雲忠一中将・機動部隊",
+    originLabel:"海軍（全国徴募）",
+    prefectures:[],
+    summary:"主力空母四隻を一挙に失い、開戦以来の攻勢に終止符が打たれた海戦。陸の戦いと異なり乗員は全国から徴募された海軍将兵であり、特定の郷土に結びつかない。以後、日本は戦略的主導権を失った。"
+  },
+  {
+    id:"saipan",
+    name:"サイパンの戦い",
+    period:"1944.6.15 — 7.9",
+    lat:15.18, lon:145.75, label:"サイパン",
+    jpLoss:"約 30,000 名", jpLossNote:"民間人含む・守備隊ほぼ全滅",
+    usLoss:"約 13,800 名", usLossNote:"戦死約3,400・戦傷約10,400",
+    unit:"第43師団", unitNote:"名古屋編成・斎藤義次中将",
+    originLabel:"中部（名古屋・愛知ほか）",
+    prefectures:["愛知県","岐阜県","三重県","静岡県"],
+    summary:"「絶対国防圏」の要衝。名古屋で編成された第43師団を主力とする守備隊が玉砕し、多くの在留邦人も巻き込まれた。陥落により本土がB-29の爆撃圏に入り、サイパン失陥は東条内閣総辞職の引き金となった。"
+  },
+  {
+    id:"imphal",
+    name:"インパール作戦",
+    period:"1944.3.8 — 7.3",
+    lat:24.82, lon:93.95, label:"インパール",
+    jpLoss:"約 30,000 名", jpLossNote:"戦死・戦病死、多くが退却中の餓死",
+    usLoss:"約 17,500 名", usLossNote:"英印軍の損害",
+    unit:"第15軍（第15・31・33師団）", unitNote:"牟田口廉也中将 指揮",
+    originLabel:"諸国（西日本中心）",
+    prefectures:["福岡県","熊本県","鹿児島県"],
+    summary:"英印軍の拠点インパール攻略を狙った無謀な進攻作戦。補給を軽視した強行軍は雨季のジャングルで破綻し、退路は「白骨街道」と呼ばれた。陸戦最大級の惨敗とされ、ビルマ戦線崩壊の発端となった。"
+  },
+  {
+    id:"pearl",
+    name:"真珠湾攻撃",
+    period:"1941.12.8",
+    lat:21.35, lon:-157.95, label:"真珠湾",
+    jpLoss:"約 64 名", jpLossNote:"航空機29機喪失",
+    usLoss:"約 2,400 名", usLossNote:"戦艦多数を撃沈破",
+    unit:"連合艦隊 第一航空艦隊", unitNote:"南雲忠一中将・機動部隊",
+    originLabel:"海軍（全国徴募）",
+    prefectures:[],
+    summary:"対米開戦の口火を切った奇襲。六隻の空母を擁する機動部隊がハワイの米太平洋艦隊を強襲した。乗員は全国から徴募された海軍将兵であり、特定の郷土には結びつかない。この一撃で太平洋戦争が始まった。"
+  },
+  {
+    id:"malaya",
+    name:"マレー・シンガポール攻略",
+    period:"1941.12.8 — 1942.2.15",
+    lat:1.35, lon:103.82, label:"シンガポール",
+    jpLoss:"約 9,800 名", jpLossNote:"マレー作戦全体の損害",
+    usLoss:"約 13万 名", usLossNote:"英軍 大半が捕虜",
+    unit:"第25軍（第5・第18師団 基幹）", unitNote:"山下奉文中将 指揮",
+    originLabel:"西日本（広島・福岡ほか）",
+    prefectures:["広島県","福岡県","山口県"],
+    summary:"開戦と同時に発動された緒戦の大勝。第25軍が密林を自転車で南下する電撃戦で英軍を圧倒し、難攻不落とされたシンガポール要塞をわずか七十日で陥落させた。山下中将は「マレーの虎」と称された。"
+  },
+  {
+    id:"attu",
+    name:"アッツ島の戦い",
+    period:"1943.5.12 — 5.29",
+    lat:52.9, lon:173.2, label:"アッツ島",
+    jpLoss:"約 2,650 名", jpLossNote:"守備隊ほぼ全滅",
+    usLoss:"約 1,700 名", usLossNote:"戦死約550・戦傷約1,150",
+    unit:"北海守備隊（北部軍）", unitNote:"山崎保代大佐・旭川第7師団 基幹",
+    originLabel:"北海道（旭川）",
+    prefectures:["北海道"],
+    summary:"アリューシャン列島の最北の戦場。旭川の第7師団を基幹とする守備隊が圧倒的な米軍に抗し、最後は全員突撃して全滅した。大本営はこれを初めて「玉砕」と発表し、以後この語が広く用いられた。"
+  },
+  {
+    id:"tarawa",
+    name:"タラワの戦い",
+    period:"1943.11.20 — 11.23",
+    lat:1.43, lon:172.98, label:"タラワ",
+    jpLoss:"約 4,700 名", jpLossNote:"守備隊ほぼ全滅",
+    usLoss:"約 3,300 名", usLossNote:"戦死約1,000・戦傷約2,300",
+    unit:"海軍特別陸戦隊", unitNote:"佐世保・横須賀 鎮守府 編成",
+    originLabel:"海軍（鎮守府編成）",
+    prefectures:[],
+    summary:"米軍の中部太平洋反攻の起点。環礁に築かれた堅陣を海軍特別陸戦隊が守り、米海兵隊にわずか三日で甚大な損害を強いた。鎮守府で編成された海軍部隊であり、特定の郷土には結びつかない。"
+  },
+  {
+    id:"leyte",
+    name:"レイテ沖海戦",
+    period:"1944.10.23 — 10.25",
+    lat:11.0, lon:125.5, label:"レイテ沖",
+    jpLoss:"約 1万 名", jpLossNote:"空母・戦艦など多数喪失",
+    usLoss:"約 3,000 名", usLossNote:"護衛空母など喪失",
+    unit:"連合艦隊（栗田・小沢艦隊）", unitNote:"史上最大の海戦",
+    originLabel:"海軍（全国徴募）",
+    prefectures:[],
+    summary:"比島奪回を図る米軍を迎え撃った、史上最大規模の海戦。連合艦隊は乾坤一擲の作戦を挑むも壊滅的な損害を受け、事実上その戦力を失った。この海戦で神風特別攻撃隊が初めて組織的に投入された。"
+  },
+  {
+    id:"okinawa",
+    name:"沖縄戦",
+    period:"1945.4.1 — 6.23",
+    lat:26.33, lon:127.8, label:"沖縄",
+    jpLoss:"約 18.8万 名", jpLossNote:"県民約9.4万を含む",
+    usLoss:"約 49,000 名", usLossNote:"戦死約12,500・戦傷約36,000",
+    unit:"第32軍", unitNote:"牛島満中将 指揮",
+    originLabel:"沖縄・九州",
+    prefectures:["沖縄県","鹿児島県","熊本県"],
+    summary:"本土で行われた唯一の大規模地上戦。第32軍が持久戦を展開し、住民を巻き込んだ熾烈な戦闘は三か月に及んだ。県民の四人に一人が犠牲になったとされ、戦争の悲惨を象徴する戦いとして記憶される。"
   }
-  // 例: 次を追加 → { id:"iwojima", name:"硫黄島の戦い", ... }
+  // 例: 次を追加 → { id:"tinian", name:"テニアンの戦い", ... }
 ];
 
 /* ---------- Render theatre (Pacific-centred world map) ---------- */
@@ -315,6 +461,77 @@ BATTLES.forEach(b=>{
   g.addEventListener("click",()=>select(b.id));
   mg.appendChild(g);
 });
+
+/* ---------- Theatre zoom & pan ---------- */
+(function(){
+  const theatreEl=tsvg.parentElement;
+  const base=WORLD.viewBox.split(/\s+/).map(Number);   // [x,y,w,h]
+  const aspect=base[2]/base[3];
+  const MIN_W=base[2]/14, MAX_W=base[2];               // 最大14倍まで拡大
+  const vb={x:base[0],y:base[1],w:base[2],h:base[3]};
+  const markerGroups=[...mg.children];
+  markerGroups.forEach(g=>{
+    const dot=g.querySelector(".dot");
+    g.__ax=parseFloat(dot.getAttribute("cx"));
+    g.__ay=parseFloat(dot.getAttribute("cy"));
+  });
+  function apply(){
+    tsvg.setAttribute("viewBox",`${vb.x.toFixed(2)} ${vb.y.toFixed(2)} ${vb.w.toFixed(2)} ${vb.h.toFixed(2)}`);
+    const k=vb.w/base[2];   // 縮尺（拡大すると1未満）→ 印を定寸に保つ
+    markerGroups.forEach(g=>{
+      g.setAttribute("transform",`translate(${g.__ax} ${g.__ay}) scale(${k.toFixed(4)}) translate(${-g.__ax} ${-g.__ay})`);
+    });
+  }
+  function clampPan(){
+    if(vb.x<0) vb.x=0;
+    if(vb.y<0) vb.y=0;
+    if(vb.x+vb.w>WORLD.W) vb.x=WORLD.W-vb.w;
+    if(vb.y+vb.h>WORLD.H) vb.y=WORLD.H-vb.h;
+  }
+  function toSvg(clientX,clientY){
+    const r=tsvg.getBoundingClientRect();
+    return { x:vb.x+(clientX-r.left)/r.width*vb.w, y:vb.y+(clientY-r.top)/r.height*vb.h };
+  }
+  function zoomAt(clientX,clientY,factor){
+    const p=toSvg(clientX,clientY);
+    let nw=Math.max(MIN_W,Math.min(MAX_W,vb.w*factor));
+    const nh=nw/aspect;
+    vb.x=p.x-(p.x-vb.x)*(nw/vb.w);
+    vb.y=p.y-(p.y-vb.y)*(nh/vb.h);
+    vb.w=nw; vb.h=nh;
+    clampPan(); apply();
+  }
+  function center(){const r=tsvg.getBoundingClientRect();return [r.left+r.width/2,r.top+r.height/2];}
+  // 車輪で拡大縮小（カーソル位置を中心に）
+  tsvg.addEventListener("wheel",e=>{
+    e.preventDefault();
+    zoomAt(e.clientX,e.clientY, e.deltaY>0?1.18:0.85);
+  },{passive:false});
+  // 曳いてスクロール
+  let dragging=false,moved=false,lx=0,ly=0;
+  tsvg.addEventListener("pointerdown",e=>{
+    dragging=true; moved=false; lx=e.clientX; ly=e.clientY;
+    tsvg.setPointerCapture(e.pointerId); theatreEl.classList.add("grabbing");
+  });
+  tsvg.addEventListener("pointermove",e=>{
+    if(!dragging) return;
+    const dx=e.clientX-lx, dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3) moved=true;
+    const r=tsvg.getBoundingClientRect();
+    vb.x-=dx/r.width*vb.w; vb.y-=dy/r.height*vb.h;
+    lx=e.clientX; ly=e.clientY; clampPan(); apply();
+  });
+  function endDrag(){ dragging=false; theatreEl.classList.remove("grabbing"); }
+  tsvg.addEventListener("pointerup",endDrag);
+  tsvg.addEventListener("pointercancel",endDrag);
+  // 曳行後の誤クリックで戦闘が選ばれぬよう抑止
+  mg.addEventListener("click",e=>{ if(moved){ e.stopPropagation(); e.preventDefault(); } },true);
+  // ボタン操作
+  document.getElementById("zoomIn").onclick=()=>{const[cx,cy]=center();zoomAt(cx,cy,0.7);};
+  document.getElementById("zoomOut").onclick=()=>{const[cx,cy]=center();zoomAt(cx,cy,1/0.7);};
+  document.getElementById("zoomReset").onclick=()=>{vb.x=base[0];vb.y=base[1];vb.w=base[2];vb.h=base[3];apply();};
+  apply();
+})();
 
 /* ---------- Selection logic ---------- */
 const info=document.getElementById("info");
