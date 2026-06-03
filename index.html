@@ -23,9 +23,9 @@
   --accent:#b8402b;
   --accent-2:#d9613f;
   --gold:#c9a14a;
-  --home:#cf4633;     /* 日本本国 */
-  --axis:#cf9b3f;     /* 友好国（枢軸） */
-  --allied:#5d83a6;   /* 敵対国（連合国） */
+  --home:#a83a32;     /* 日本本国（弁柄・沈めた赤） */
+  --axis:#d4a23e;     /* 友好国（枢軸・琥珀） */
+  --allied:#6f93b3;   /* 敵対国（連合国・縹） */
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -93,9 +93,9 @@ h1 .sub{display:block;font-size:.42em;font-weight:600;color:var(--gold);
 #graticule line{stroke:rgba(150,200,225,.10);stroke-width:.6;vector-effect:non-scaling-stroke}
 /* historical zones */
 #zones{pointer-events:none}
-#zones .sphere-fill{fill:rgba(207,155,63,.14);stroke:rgba(224,179,74,.55);
+#zones .sphere-fill{fill:rgba(207,155,63,.13);stroke:rgba(243,234,210,.5);
   stroke-width:1;stroke-dasharray:2 2.5;vector-effect:non-scaling-stroke}
-#zones .defense-line{fill:none;stroke:#f0c95a;stroke-width:1.8;
+#zones .defense-line{fill:none;stroke:#c0503a;stroke-width:1.8;
   stroke-dasharray:7 4;stroke-linejoin:round;stroke-linecap:round;
   vector-effect:non-scaling-stroke;filter:drop-shadow(0 0 2px rgba(0,0,0,.5))}
 #zones.hide-sphere .sphere-fill{display:none}
@@ -105,8 +105,8 @@ h1 .sub{display:block;font-size:.42em;font-weight:600;color:var(--gold);
   font-size:.78rem;color:var(--paper)}
 .zones-legend input{accent-color:var(--gold);cursor:pointer}
 .legend i.ln{width:22px;height:0;border-radius:0;background:none!important}
-.legend i.ln.sphere{border-top:2px dotted rgba(224,179,74,.9)}
-.legend i.ln.defense{border-top:3px dashed #f0c95a}
+.legend i.ln.sphere{border-top:2px dotted rgba(243,234,210,.85)}
+.legend i.ln.defense{border-top:3px dashed #c0503a}
 /* zoom controls */
 .map-ctrl{position:absolute;top:10px;right:10px;display:flex;flex-direction:column;gap:6px;z-index:3}
 .map-ctrl button{width:32px;height:32px;border:1px solid rgba(201,161,74,.5);
