@@ -154,6 +154,22 @@ h1 .sub{display:block;font-size:.42em;font-weight:600;color:var(--gold);
 @keyframes lit{0%,100%{fill:var(--accent)}50%{fill:var(--accent-2)}}
 .japan-dim .pref:not(.lit){fill:#6f6a5a;opacity:.55}
 
+/* ---------- Loss pictograph（投入と損耗） ---------- */
+.loss-viz{margin-top:12px;padding:12px 14px;display:none;
+  border:1px solid rgba(201,161,74,.25);border-radius:4px;background:rgba(13,28,37,.4)}
+.loss-viz.show{display:block}
+.loss-viz .lv-head{font-family:"Shippori Mincho B1",serif;color:var(--gold);
+  font-weight:600;font-size:.92rem;margin-bottom:10px;letter-spacing:.03em}
+.loss-viz .lv-figs{display:flex;flex-wrap:wrap;gap:3px 4px;margin-bottom:10px}
+.loss-viz .fig{width:11px;height:19px;display:block;color:#dfe7ee}
+.loss-viz .fig svg{width:100%;height:100%;display:block;fill:currentColor}
+.loss-viz .fig.lost{color:var(--home);opacity:.45}
+.loss-viz .lv-text{font-size:.82rem;color:rgba(233,222,195,.9);line-height:1.6}
+.loss-viz .lv-text b{color:#f3ead2;font-weight:700}
+.loss-viz .lv-text .pct{color:var(--accent-2);font-weight:700;
+  font-family:"Shippori Mincho B1",serif;font-size:1.02rem}
+.loss-viz .lv-note{font-size:.7rem;color:rgba(233,222,195,.5);margin-top:6px}
+
 /* ---------- Info card ---------- */
 .info{margin-top:22px;
   background:
@@ -254,6 +270,7 @@ footer{margin-top:30px;text-align:center;font-size:.72rem;color:#5a5544;letter-s
       <div class="japan-stage">
         <svg id="japan" preserveAspectRatio="xMidYMid meet"></svg>
       </div>
+      <div class="loss-viz" id="lossViz"></div>
     </section>
   </div>
 
@@ -433,6 +450,23 @@ const BATTLES = [
   }
   // 例: 次を追加 → { id:"tinian", name:"テニアンの戦い", ... }
 ];
+
+/* 投入兵力（日本軍 将兵）と戦没数の概数（いずれも仮データ）。
+   f=投入兵力, l=戦没。損耗の割合を絵で示すために用いる。 */
+const FORCE = {
+  peleliu:    {f:10500,  l:10000 },
+  iwojima:    {f:21000,  l:21000 },
+  guadalcanal:{f:31400,  l:20800 },
+  midway:     {f:6200,   l:3000  },
+  saipan:     {f:31600,  l:30000 },
+  imphal:     {f:86000,  l:30000 },
+  pearl:      {f:1000,   l:64    },
+  malaya:     {f:70000,  l:9800  },
+  attu:       {f:2650,   l:2650  },
+  tarawa:     {f:4800,   l:4700  },
+  leyte:      {f:42000,  l:10000 },
+  okinawa:    {f:116000, l:110000}
+};
 
 /* ---------- Render theatre (Pacific-centred world map) ---------- */
 const SVGNS="http://www.w3.org/2000/svg";
@@ -726,6 +760,34 @@ const hint=document.getElementById("hint");
 
 function clearLit(){document.querySelectorAll(".pref.lit").forEach(p=>p.classList.remove("lit"));}
 
+/* 投入兵力と損耗の絵組み（人型アイコン＋文字） */
+const lossViz=document.getElementById("lossViz");
+const FIG_SVG='<svg viewBox="0 0 11 19" aria-hidden="true"><circle cx="5.5" cy="3.2" r="3"/><path d="M5.5 6.4c2.6 0 3.6 1.8 3.6 4.6v5.2c0 1.2-.6 2-1.6 2H3.5c-1 0-1.6-.8-1.6-2v-5.2c0-2.8 1-4.6 3.6-4.6Z"/></svg>';
+function niceUnit(force){
+  const units=[50,100,200,250,500,1000,2000,2500,5000,10000];
+  for(const u of units){ if(force/u<=40) return u; }
+  return 20000;
+}
+function fmtMen(n){ return n>=100000 ? +(n/10000).toFixed(1)+"万" : n.toLocaleString(); }
+function renderLossViz(b){
+  const fd=FORCE[b.id];
+  if(!fd){ lossViz.className="loss-viz"; lossViz.innerHTML=""; return; }
+  const {f,l}=fd;
+  const unit=niceUnit(f);
+  const total=Math.max(1,Math.round(f/unit));
+  const lost=Math.min(total,Math.round(l/unit));
+  const pct=Math.round(l/f*100);
+  let figs="";
+  for(let i=0;i<total;i++){ figs+=`<span class="fig${i<lost?" lost":""}">${FIG_SVG}</span>`; }
+  const naval=b.prefectures.length===0;
+  lossViz.innerHTML=
+    `<div class="lv-head">投入兵力と損耗 — ${b.originLabel}</div>`+
+    `<div class="lv-figs">${figs}</div>`+
+    `<div class="lv-text">投入 約<b>${fmtMen(f)}</b>名 ／ うち戦没 約<b>${fmtMen(l)}</b>名 　<span class="pct">${pct}%</span> が失われた</div>`+
+    `<div class="lv-note">人型1つ ≈ ${unit.toLocaleString()}名（概数・仮データ）${naval?"／ 海軍の戦い（郷土動員なし）":""}</div>`;
+  lossViz.className="loss-viz show";
+}
+
 function select(id){
   const b=BATTLES.find(x=>x.id===id);
   if(!b) return;
@@ -740,6 +802,7 @@ function select(id){
   // 動員地域へ寄せて拡大（海軍の戦いは全体表示へ戻す）
   if(b.prefectures.length) fitJapanToPrefectures(b.prefectures);
   else animateJapanViewBox(JAPAN_BASE);
+  renderLossViz(b);   // 投入兵力と損耗の絵組み
 
   placeholder.style.display="none";
   infoInner.style.display="block";
